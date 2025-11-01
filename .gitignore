@@ -40,3 +40,6 @@ Pods/
 *.key
 secrets.json
 Whishpermate/Whispermate/Secrets.plist
+
+# ignore gitpmoji directory
+.gitpmoji

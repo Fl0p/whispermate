@@ -1,0 +1,43 @@
+name: Whispermate
+options:
+  bundleIdPrefix: com.whispermate
+  deploymentTarget:
+    macOS: "13.0"
+  developmentLanguage: en
+  defaultConfig: Debug
+targets:
+  Whispermate:
+    type: application
+    platform: macOS
+    sources:
+      - path: Whispermate
+        excludes:
+          - "*.md"
+          - "Secrets.template.plist"
+    settings:
+      base:
+        PRODUCT_NAME: Whishpermate
+        PRODUCT_BUNDLE_IDENTIFIER: com.whispermate.Whishpermate
+        MARKETING_VERSION: 0.0.7
+        CURRENT_PROJECT_VERSION: 1
+        INFOPLIST_FILE: Whispermate/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Whispermate/Whispermate.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_HARDENED_RUNTIME: YES
+        COMBINE_HIDPI_IMAGES: YES
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "13.0"
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: "Whispermate needs microphone access to record audio for transcription."
+        INFOPLIST_KEY_NSAppleEventsUsageDescription: "Whispermate needs accessibility permissions to paste transcribed text."
+        INFOPLIST_KEY_CFBundleName: Whispermate
+        INFOPLIST_KEY_CFBundleDisplayName: Whispermate
+        INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.productivity"
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+          SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+        Release:
+          SWIFT_OPTIMIZATION_LEVEL: "-O"
+          SWIFT_COMPILATION_MODE: wholemodule
+
