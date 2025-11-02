@@ -26,7 +26,10 @@ class HotkeyManager: ObservableObject {
     var onDoubleTap: (() -> Void)?
 
     private init() {
-        loadHotkey()
+        // Defer loadHotkey to avoid blocking during SwiftUI initialization
+        DispatchQueue.main.async { [weak self] in
+            self?.loadHotkey()
+        }
     }
 
     func setDeferRegistration(_ shouldDefer: Bool) {
