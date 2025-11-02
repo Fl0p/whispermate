@@ -75,6 +75,7 @@ class SileroVAD {
 
     /// Analyze audio file for speech
     func analyzeAudio(url: URL, threshold: Float = 0.3) async throws -> Bool {
+        return true
         // Ensure model is loaded
         if model == nil {
             await loadModel()
