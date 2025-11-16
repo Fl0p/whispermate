@@ -10,7 +10,6 @@ enum OnboardingStep: Int, CaseIterable {
     case accessibility = 1
     case language = 2
     case hotkey = 3
-    case prompts = 4
 
     var title: String {
         switch self {
@@ -18,7 +17,6 @@ enum OnboardingStep: Int, CaseIterable {
         case .accessibility: return "Enable Accessibility"
         case .language: return "Select Your Languages"
         case .hotkey: return "Set Your Hotkey"
-        case .prompts: return "Configure Text Rules"
         }
     }
 
@@ -28,7 +26,6 @@ enum OnboardingStep: Int, CaseIterable {
         case .accessibility: return "hand.tap.fill"
         case .language: return "globe"
         case .hotkey: return "keyboard.fill"
-        case .prompts: return "text.badge.checkmark"
         }
     }
 
@@ -42,8 +39,6 @@ enum OnboardingStep: Int, CaseIterable {
             return "Select the languages you speak. You can choose multiple languages or use auto-detect."
         case .hotkey:
             return "Choose your preferred hotkey to control recording. Press and hold to record, or double-tap to start/stop long recording."
-        case .prompts:
-            return "Add rules to improve transcription quality. You can enable/disable, add, or delete rules anytime in settings."
         }
     }
 }
@@ -79,8 +74,14 @@ class OnboardingManager: ObservableObject {
         // Check if user has completed onboarding before
         let hasCompleted = UserDefaults.standard.bool(forKey: onboardingCompletedKey)
 
-        if hasCompleted {
-            // Even if completed, check if all permissions are still granted
+        if !hasCompleted {
+            // First time launch - ALWAYS show onboarding, regardless of permission status
+            DebugLog.info("First launch detected - showing mandatory onboarding", context: "OnboardingManager")
+            showOnboarding = true
+            currentStep = .microphone
+        } else {
+            // User has completed onboarding before
+            // Check if all permissions are still granted
             let allGranted = checkAllPermissions()
             showOnboarding = !allGranted
 
@@ -91,11 +92,6 @@ class OnboardingManager: ObservableObject {
             } else {
                 DebugLog.info("All permissions granted, skipping onboarding", context: "OnboardingManager")
             }
-        } else {
-            // First time launch - always show onboarding
-            DebugLog.info("First launch, showing onboarding", context: "OnboardingManager")
-            showOnboarding = true
-            currentStep = .microphone
         }
     }
 
@@ -121,7 +117,6 @@ class OnboardingManager: ObservableObject {
         case .accessibility: return isAccessibilityGranted()
         case .language: return true // Always allow continuing from language step
         case .hotkey: return isHotkeyConfigured()
-        case .prompts: return true // Always allow continuing from prompts step
         }
     }
 
@@ -191,6 +186,13 @@ class OnboardingManager: ObservableObject {
 
     func reopenOnboarding() {
         DebugLog.info("Reopening onboarding", context: "OnboardingManager")
+        currentStep = .microphone
+        showOnboarding = true
+    }
+
+    func resetOnboarding() {
+        DebugLog.info("Resetting onboarding status", context: "OnboardingManager")
+        UserDefaults.standard.removeObject(forKey: onboardingCompletedKey)
         currentStep = .microphone
         showOnboarding = true
     }

@@ -11,11 +11,13 @@ enum OpenAIError: Error {
 /// Unified OpenAI-compatible client that works with Groq, OpenAI, and any OpenAI-compatible API
 /// Single client configured once and used everywhere
 class OpenAIClient {
-    // Custom URLSession with 5 second timeout - fail fast
+    // Custom URLSession optimized for persistent connections and SSL session reuse
     private static let urlSession: URLSession = {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 5.0  // 5 seconds max
-        config.timeoutIntervalForResource = 5.0  // 5 seconds max
+        config.timeoutIntervalForRequest = 5.0  // Fail fast - 5 seconds max per request
+        config.timeoutIntervalForResource = 300.0  // Keep connection alive for 5 minutes
+        config.httpMaximumConnectionsPerHost = 6  // Allow multiple connections to same host
+        // URLSession automatically handles SSL session resumption and connection reuse
         return URLSession(configuration: config)
     }()
 
@@ -262,39 +264,42 @@ class OpenAIClient {
     ) async throws -> String {
         let startTime = CFAbsoluteTimeGetCurrent()
 
-        // Step 1: Transcribe
+        // Build prompt with formatting rules if provided
+        var combinedPrompt = prompt ?? ""
+
+        if !formattingRules.isEmpty {
+            let rulesText = formattingRules.joined(separator: "\n")
+            if combinedPrompt.isEmpty {
+                combinedPrompt = rulesText
+            } else {
+                combinedPrompt += "\n\n" + rulesText
+            }
+
+            if let appContext = appContext {
+                combinedPrompt += "\n\nContext: The user is currently in \(appContext)."
+            }
+        }
+
+        // Transcribe with formatting rules in prompt
+        // The custom API will handle two-stage processing (Whisper + LLM refinement)
         let rawTranscription = try await transcribe(
             audioURL: audioURL,
-            prompt: prompt
+            prompt: combinedPrompt.isEmpty ? nil : combinedPrompt
         )
 
         // Check if transcription is empty
         let trimmed = rawTranscription.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            DebugLog.warning("Empty transcription - skipping formatting", context: "OpenAIClient")
+            DebugLog.warning("Empty transcription", context: "OpenAIClient")
             return rawTranscription
         }
-
-        // Step 2: Apply formatting rules (if any)
-        guard !formattingRules.isEmpty else {
-            return rawTranscription
-        }
-
-        // Switch to LLM API key if provided
-        if let llmKey = llmApiKey {
-            var newConfig = config
-            newConfig.apiKey = llmKey
-            updateConfig(newConfig)
-        }
-
-        let result = try await applyFormattingRules(transcription: rawTranscription, rules: formattingRules, languageCodes: languageCodes, appContext: appContext)
 
         let endTime = CFAbsoluteTimeGetCurrent()
         let totalDuration = endTime - startTime
-        DebugLog.info("Transcribe & format completed in \(String(format: "%.2f", totalDuration))s", context: "OpenAIClient")
+        DebugLog.info("Transcription completed in \(String(format: "%.2f", totalDuration))s", context: "OpenAIClient")
         print("⏱️ [Total Pipeline] \(String(format: "%.2f", totalDuration))s")
 
-        return result
+        return rawTranscription
     }
 
     /// Apply formatting rules to transcription using chat completion

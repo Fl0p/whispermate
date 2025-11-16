@@ -22,7 +22,7 @@ enum TranscriptionProvider: String, CaseIterable, Identifiable {
         switch self {
         case .groq: return "Whisper Large V3"
         case .openai: return "Whisper API"
-        case .custom: return "OpenAI-compatible API"
+        case .custom: return "Enhanced Whisper + LLM"
         }
     }
 
@@ -30,7 +30,7 @@ enum TranscriptionProvider: String, CaseIterable, Identifiable {
         switch self {
         case .groq: return "https://api.groq.com/openai/v1/audio/transcriptions"
         case .openai: return "https://api.openai.com/v1/audio/transcriptions"
-        case .custom: return ""
+        case .custom: return "https://new-git-fix-workspace-image-handling-and-api-28a97e-writingmate.vercel.app/api/openai/v1/audio/transcriptions"
         }
     }
 
@@ -38,7 +38,7 @@ enum TranscriptionProvider: String, CaseIterable, Identifiable {
         switch self {
         case .groq: return "whisper-large-v3-turbo"
         case .openai: return "whisper-1"
-        case .custom: return ""
+        case .custom: return "gpt-4o-transcribe"
         }
     }
 
@@ -48,7 +48,7 @@ enum TranscriptionProvider: String, CaseIterable, Identifiable {
 }
 
 class TranscriptionProviderManager: ObservableObject {
-    @Published var selectedProvider: TranscriptionProvider = .groq
+    @Published var selectedProvider: TranscriptionProvider = .custom
     @Published var customEndpoint: String = ""
     @Published var customModel: String = ""
 
@@ -64,6 +64,9 @@ class TranscriptionProviderManager: ObservableObject {
         if let savedProvider = UserDefaults.standard.string(forKey: providerKey),
            let provider = TranscriptionProvider(rawValue: savedProvider) {
             selectedProvider = provider
+        } else {
+            // Default to custom provider if no saved preference
+            selectedProvider = .custom
         }
         customEndpoint = UserDefaults.standard.string(forKey: endpointKey) ?? ""
         customModel = UserDefaults.standard.string(forKey: modelKey) ?? ""
@@ -84,6 +87,13 @@ class TranscriptionProviderManager: ObservableObject {
     }
 
     var effectiveEndpoint: String {
+        // For custom provider, check Secrets.plist first
+        if selectedProvider == .custom {
+            if let secretEndpoint = SecretsLoader.customTranscriptionEndpoint(), !secretEndpoint.isEmpty {
+                return secretEndpoint
+            }
+        }
+
         if !customEndpoint.isEmpty {
             return customEndpoint
         }
@@ -91,6 +101,13 @@ class TranscriptionProviderManager: ObservableObject {
     }
 
     var effectiveModel: String {
+        // For custom provider, check Secrets.plist first
+        if selectedProvider == .custom {
+            if let secretModel = SecretsLoader.customTranscriptionModel(), !secretModel.isEmpty {
+                return secretModel
+            }
+        }
+
         if !customModel.isEmpty {
             return customModel
         }

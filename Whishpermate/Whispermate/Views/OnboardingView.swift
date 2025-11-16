@@ -32,13 +32,11 @@ struct OnboardingView: View {
             // Content area
             ScrollView {
                 VStack(spacing: 20) {
-                    // Icon (hidden for prompts step to save space)
-                    if onboardingManager.currentStep != .prompts {
-                        Image(systemName: onboardingManager.currentStep.icon)
-                            .font(.system(size: 64))
-                            .foregroundStyle(Color.accentColor)
-                            .padding(.top, 8)
-                    }
+                    // Icon
+                    Image(systemName: onboardingManager.currentStep.icon)
+                        .font(.system(size: 64))
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.top, 8)
 
                     // Title
                     Text(onboardingManager.currentStep.title)
@@ -267,65 +265,6 @@ struct OnboardingView: View {
                     stopFnKeyMonitoring()
                 }
             }
-
-        case .prompts:
-            VStack(spacing: 16) {
-                // Rules table
-                RulesTable(
-                    promptRulesManager: promptRulesManager,
-                    newRuleText: $newRuleText
-                )
-
-                // Live preview section with divider
-                HStack {
-                    VStack { Divider() }
-                    Text("See it in action")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 8)
-                    VStack { Divider() }
-                }
-                .padding(.vertical, 4)
-
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 8) {
-                        TextField("Try example text...", text: $exampleText)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.system(size: 12))
-
-                        Button(action: {
-                            Task {
-                                await processExample()
-                            }
-                        }) {
-                            if isProcessingExample {
-                                ProgressView()
-                                    .scaleEffect(0.6)
-                                    .frame(width: 16, height: 16)
-                            } else {
-                                Image(systemName: "arrow.right.circle.fill")
-                                    .font(.system(size: 18))
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(exampleText.isEmpty || isProcessingExample)
-                    }
-
-                    if !processedText.isEmpty {
-                        Text(processedText)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.primary)
-                            .padding(10)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color.accentColor.opacity(0.1))
-                            )
-                    }
-                }
-            }
-            .padding(.horizontal, 40)
-            .frame(maxWidth: .infinity)
         }
     }
 
@@ -390,9 +329,9 @@ struct OnboardingView: View {
 
         case .hotkey:
             Button(action: {
-                onboardingManager.moveToNextStep()
+                onboardingManager.completeOnboarding()
             }) {
-                Text("Continue")
+                Text("Get Started")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
@@ -404,22 +343,6 @@ struct OnboardingView: View {
             }
             .buttonStyle(.plain)
             .disabled(hotkeyManager.currentHotkey == nil)
-
-        case .prompts:
-            Button(action: {
-                onboardingManager.completeOnboarding()
-            }) {
-                Text("Get Started")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-                    .background(
-                        Capsule()
-                            .fill(Color.accentColor)
-                    )
-            }
-            .buttonStyle(.plain)
         }
     }
 

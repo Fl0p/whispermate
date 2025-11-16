@@ -5,11 +5,14 @@ internal import Combine
 class AudioRecorder: NSObject, ObservableObject {
     @Published var isRecording = false
     @Published var audioLevel: Float = 0.0  // Audio level for visualization (0.0 to 1.0)
+    @Published var frequencyBands: [Float] = Array(repeating: 0.0, count: 14)  // Frequency spectrum data
 
     private var audioRecorder: AVAudioRecorder?
+    private var audioEngine: AVAudioEngine?
     private var recordingURL: URL?
     private var levelTimer: Timer?
     private let volumeManager = AudioVolumeManager()
+    private let frequencyAnalyzer = FrequencyAnalyzer()
 
     override init() {
         super.init()
@@ -25,9 +28,11 @@ class AudioRecorder: NSObject, ObservableObject {
             _ = stopRecording()
         }
 
-        // Lower system volume for better recording quality
-        // Disabled: This mutes audio playback during recording
-        // volumeManager.lowerVolume()
+        // Lower system volume to duck other audio (if enabled in settings)
+        let shouldMuteAudio = UserDefaults.standard.object(forKey: "muteAudioWhenRecording") as? Bool ?? true
+        if shouldMuteAudio {
+            volumeManager.lowerVolume()
+        }
 
         let fileManager = FileManager.default
         let tempDirectory = fileManager.temporaryDirectory
@@ -42,9 +47,13 @@ class AudioRecorder: NSObject, ObservableObject {
         ]
 
         do {
+            // Start AVAudioRecorder for actual recording
             audioRecorder = try AVAudioRecorder(url: recordingURL!, settings: settings)
-            audioRecorder?.isMeteringEnabled = true  // Enable metering for visualization
+            audioRecorder?.isMeteringEnabled = true
             audioRecorder?.record()
+
+            // Start AVAudioEngine for frequency analysis
+            startFrequencyAnalysis()
 
             // Start timer to update audio levels
             levelTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
@@ -71,6 +80,32 @@ class AudioRecorder: NSObject, ObservableObject {
         }
     }
 
+    private func startFrequencyAnalysis() {
+        let engine = AVAudioEngine()
+        let inputNode = engine.inputNode
+        let bus = 0
+        let inputFormat = inputNode.outputFormat(forBus: bus)
+
+        // Install tap for frequency analysis only (not for recording)
+        inputNode.installTap(onBus: bus, bufferSize: 2048, format: inputFormat) { [weak self] buffer, _ in
+            guard let self = self else { return }
+
+            // Analyze frequencies
+            let bands = self.frequencyAnalyzer.analyze(buffer: buffer)
+
+            DispatchQueue.main.async {
+                self.frequencyBands = bands
+            }
+        }
+
+        do {
+            try engine.start()
+            audioEngine = engine
+        } catch {
+            DebugLog.info("Failed to start frequency analysis: \(error)", context: "AudioRecorder LOG")
+        }
+    }
+
     private func normalizeAudioLevel(_ power: Float) -> Float {
         // Convert dB (-160 to 0) to normalized 0.0-1.0 scale
         // Using -60dB as minimum threshold for increased sensitivity
@@ -93,16 +128,25 @@ class AudioRecorder: NSObject, ObservableObject {
         levelTimer?.invalidate()
         levelTimer = nil
 
+        // Stop audio recorder
         audioRecorder?.stop()
 
-        // Restore system volume
-        // Disabled: Volume lowering is disabled
-        // volumeManager.restoreVolume()
+        // Stop frequency analysis engine
+        audioEngine?.inputNode.removeTap(onBus: 0)
+        audioEngine?.stop()
+        audioEngine = nil
+
+        // Restore system volume (if it was lowered)
+        let shouldMuteAudio = UserDefaults.standard.object(forKey: "muteAudioWhenRecording") as? Bool ?? true
+        if shouldMuteAudio {
+            volumeManager.restoreVolume()
+        }
 
         // Update UI state on main thread
         DispatchQueue.main.async {
             self.isRecording = false
             self.audioLevel = 0.0
+            self.frequencyBands = Array(repeating: 0.0, count: 14)
         }
 
         DebugLog.info("stopRecording completed, recordingURL: \(String(describing: recordingURL))", context: "AudioRecorder LOG")
@@ -120,9 +164,15 @@ class AudioRecorder: NSObject, ObservableObject {
         levelTimer = nil
         audioRecorder = nil
 
+        // Stop frequency analysis
+        if audioEngine?.isRunning == true {
+            audioEngine?.inputNode.removeTap(onBus: 0)
+            audioEngine?.stop()
+        }
+        audioEngine = nil
+
         // Restore volume as a safety measure
-        // Disabled: Volume lowering is disabled
-        // volumeManager.restoreVolume()
+        volumeManager.restoreVolume()
 
         DebugLog.info("✅ Cleanup complete", context: "AudioRecorder LOG")
     }
